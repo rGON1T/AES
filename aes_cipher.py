@@ -1,65 +1,41 @@
-from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+import aes128
 
 l = int(input("input key size in bytes:"))
-key = input("input key     : ").encode('UTF-8')
+key = input("input key     : ")
 
 if (len(key) != l):
     print("key length isn't", l)
 
-
-# def encrypt(data):
-#     cipher = AES.new(key, AES.MODE_CBC)
-#     ciphertext = cipher.encrypt(pad(data.encode('UTF-8'), AES.block_size))
-#     iv = cipher.iv
-#     return ciphertext, iv
-def encrypt(data):
-    cipher = AES.new(key, AES.MODE_EAX)
-    nonce = cipher.nonce
-    ciphertext, tag = cipher.encrypt_and_digest(data.encode('UTF-8'))
-    return nonce, ciphertext, tag
-
-
-def decrypt(ciphertext, tag, nonce):
-    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
-    plaintext = cipher.decrypt(ciphertext)
-    try:
-        cipher.verify(tag)
-        return plaintext.decode('UTF-8')
-    except:
-        return False
-
-
-# def decrypt(ciphertext, iv):
-#     cipher = AES.new(key, AES.MODE_CBC, iv)
-#     try:
-#         plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-#         return plaintext.decode('UTF-8')
-#     except:
-#         return False
-
 if (input("decode or encode:") == "encode"):
-    file_in = open("text_in.txt", "r")
+    file_in = open("text_in.txt", "rb")
     file_out = open("text_out.txt", "wb")
-    for line in file_in:
-        nonce, ciphertext, tag = encrypt(line)
-        [file_out.write(x) for x in (nonce, tag, ciphertext)]
-    file_out.close()
-    file_in.close()
+    data = file_in.read()
+    if len(data) % 16 != 0:
+        data = pad(data, 16)
+    crypted_data = []
+    temp = []
+    for byte in data:
+        temp.append(byte)
+        if len(temp) == 16:
+            crypted_part = aes128.encrypt(temp, key)
+            crypted_data.extend(crypted_part)
+            del temp[:]
+
+    file_out.write(bytes(crypted_data))
 else:
     file_out = open("text_out.txt", "rb")
-    file_in = open("text_in.txt", "w")
-    for line in file_out:
-        nonce = line[0:16]
-        tag = line[16:32]
-        ciphertext = line[32::]
-        file_in.write(decrypt(ciphertext, tag, nonce))
-    file_out.close()
-    file_in.close()
-# plaintext = decrypt(ciphertext, tag, nonce)
-# ciphertext, iv = encrypt(input("your message:"))
-# plaintext = decrypt(ciphertext, iv)
-# print(ciphertext)
-# if not plaintext:
-#     print('message corrupted')
-# else:
-#     print(f'Plain text: {plaintext}')
+    file_in = open("text_in.txt", "wb")
+    data = file_out.read()
+    decrypted_data = []
+    temp = []
+    for byte in data:
+        temp.append(byte)
+        if len(temp) == 16:
+            decrypted_part = aes128.decrypt(temp, key)
+            decrypted_data.extend(decrypted_part)
+            del temp[:]
+    file_in.write(unpad(bytes(decrypted_data), 16))
+
+file_out.close()
+file_in.close()
